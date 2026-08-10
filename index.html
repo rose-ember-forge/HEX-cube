@@ -3,6 +3,20 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    // Basic SEO
+    <meta name="description" content="An interactive 3D hex color cube mapping 4,096 RGB colors. Explore geometric color theory, triadic harmonies, and complementary palettes in 3D space.">
+    <meta name="keywords" content="3D color cube, RGB, hex color, color theory, interactive visualization, three.js, data visualization">
+    <meta name="author" content="Rose">
+
+    <!-- Open Graph / Social Sharing Tags -->
+    <meta property="og:title" content="Interactive 3D Hex Color Cube">
+    <meta property="og:description" content="Explore RGB color space, hex codes, and geometric color theory harmonies in an interactive 3D environment.">
+    <meta property="og:type" content="website">
+
+    // Google verification
+    <meta name="google-site-verification" content="i4zkNOHKJ5NE2ybN-aRrpiDgxXmtTVCEcFrG-3XLrFk" />
+
     <title>Hex Color Cube</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -138,6 +152,30 @@
             font-size: 0.72rem;
             border: 1px solid #3f3f46;
         }
+        /* Dimmed state for search bar when selecting points via 3D click */
+        #hex-search.dimmed {
+            color: #666670 !important;
+            border-color: rgba(255, 255, 255, 0.08) !important;
+        }
+
+        /* Floating custom tooltip element */
+        #custom-tooltip {
+            position: fixed;
+            pointer-events: none;
+            z-index: 1000;
+            background: rgba(18, 18, 20, 0.9);
+            color: #ffffff;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 6px;
+            padding: 4px 8px;
+            font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+            font-size: 0.78rem;
+            font-weight: 600;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+            display: none;
+            transform: translate(12px, 12px);
+            backdrop-filter: blur(4px);
+        }
     </style>
     <!-- Three.js and OrbitControls via CDN -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -169,7 +207,34 @@
     </div>
 
     <div id="inspector-panel" class="ui-panel">
-        <div id="color-preview" class="color-preview-box" style="background-color: #888888;"></div>
+        <!-- Hex Search Input -->
+        <div class="slider-group">
+            <label for="hex-search"><span>Search Color (Hex)</span></label>
+            <div style="display: flex; gap: 6px;">
+                <input type="text" id="hex-search" placeholder="#F00 or #FF0000" maxlength="7" style="
+                    flex: 1;
+                    padding: 8px;
+                    border-radius: 6px;
+                    background: #27272a;
+                    color: #fff;
+                    border: 1px solid rgba(255,255,255,0.15);
+                    font-family: monospace;
+                    font-size: 0.88rem;
+                    text-transform: uppercase;
+                ">
+                <button id="search-btn" class="control-btn" style="width: auto; padding: 0 12px;">Go</button>
+            </div>
+        </div>
+    
+        <!-- Dynamic Main & Harmony Preview Panel -->
+        <div style="display: flex; flex-direction: column; gap: 6px;">
+            <div id="color-preview" class="color-preview-box" style="background-color: #888888;"></div>
+            <div id="harmony-preview-container" style="display: none; flex-direction: column; gap: 4px;">
+                <span style="font-size: 0.72rem; color: #888896; font-weight: 600; text-transform: uppercase;">Harmonic Palette</span>
+                <div id="harmony-preview-row" style="display: flex; gap: 6px; height: 32px;"></div>
+            </div>
+        </div>
+    
         <div>
             <div class="info-row">
                 <span class="info-label">Shorthand Hex</span>
@@ -192,7 +257,8 @@
                 <span class="info-value" id="info-b">Hex: 8 (Dec: 8)</span>
             </div>
         </div>
-        
+    
+        <!-- Harmony Dropdown -->
         <div class="slider-group" style="margin-top: 4px;">
             <label for="harmony-select"><span>Color Harmony</span></label>
             <select id="harmony-select" style="
@@ -213,12 +279,30 @@
                 <option value="monochromatic">Monochromatic (Shades/Tints)</option>
             </select>
         </div>
-
+    
         <button id="focus-btn" class="control-btn" disabled>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
             Zoom & Focus Point
         </button>
     </div>
+
+    <div id="custom-tooltip"></div>
+    <div id="copy-toast" style="
+        position: fixed;
+        bottom: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: #22c55e;
+        color: #fff;
+        font-weight: 600;
+        font-size: 0.82rem;
+        padding: 8px 16px;
+        border-radius: 20px;
+        box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+        z-index: 1000;
+        display: none;
+        pointer-events: none;
+    ">Copied to Clipboard!</div>
 
     <div class="instructions">
         <b>Controls:</b> <kbd>Left Click + Drag</kbd> Rotate | <kbd>Right Click + Drag</kbd> Pan / Roam | <kbd>Scroll</kbd> Zoom | <kbd>Click Point</kbd> Select
@@ -253,6 +337,11 @@
         const boundingBox = new THREE.LineSegments(boxEdges, boxMaterial);
         boundingBox.position.set(7.5, 7.5, 7.5);
         scene.add(boundingBox);
+
+        // Dim text in search box when clicking on the cube.
+        const searchInput = document.getElementById('hex-search');
+        searchInput.addEventListener('input', () => searchInput.classList.remove('dimmed'));
+        searchInput.addEventListener('focus', () => searchInput.classList.remove('dimmed'));
 
         // Grid helpers along axes
         const gridHelperX = new THREE.GridHelper(15, 15, 0xef4444, 0x27272a);
@@ -349,24 +438,32 @@
             selectedIndex = index;
             const pt = colorData[index];
 
-            // Update UI
-            document.getElementById('color-preview').style.backgroundColor = pt.hex_full;
-            document.getElementById('color-preview').style.boxShadow = `0 0 20px ${pt.hex_full}88`;
+            // Dim the search text to indicate active point changed via manual click
+            document.getElementById('hex-search').classList.add('dimmed');
+
+            const mainPreview = document.getElementById('color-preview');
+            mainPreview.style.backgroundColor = pt.hex_full;
+            mainPreview.style.boxShadow = `0 0 20px ${pt.hex_full}88`;
+            mainPreview.style.cursor = 'pointer';
+
+            // Attach hover tooltip and click-to-copy on main preview box
+            mainPreview.onclick = null; // Clear previous
+            attachSwatchInteractivity(mainPreview, pt.hex_full);
+
             document.getElementById('info-hex-short').textContent = pt.hex_short;
             document.getElementById('info-hex-full').textContent = pt.hex_full;
             document.getElementById('info-r').textContent = `Hex: ${pt.r.toString(16).toUpperCase()} (Dec: ${pt.r})`;
             document.getElementById('info-g').textContent = `Hex: ${pt.g.toString(16).toUpperCase()} (Dec: ${pt.g})`;
             document.getElementById('info-b').textContent = `Hex: ${pt.b.toString(16).toUpperCase()} (Dec: ${pt.b})`;
-            // Add these two lines at the end of the selectPoint(index) function:
-            document.getElementById('harmony-select').disabled = false;
-            applyHarmonyFilter();
 
             document.getElementById('focus-btn').disabled = false;
+            document.getElementById('harmony-select').disabled = false;
 
-            // Highlight ring position
             focusRing.position.set(pt.r, pt.g, pt.b);
             focusRing.lookAt(camera.position);
             focusRing.visible = true;
+
+            applyHarmonyFilter();
         }
 
         // --- Smooth Camera Animation (TWEEN) ---
@@ -432,12 +529,56 @@
             return Math.min(diff, 1.0 - diff);
         }
 
+        const tooltip = document.getElementById('custom-tooltip');
+        const copyToast = document.getElementById('copy-toast');
+
+        // Floating tooltip tracker
+        window.addEventListener('mousemove', (e) => {
+            if (tooltip.style.display === 'block') {
+                tooltip.style.left = e.clientX + 'px';
+                tooltip.style.top = e.clientY + 'px';
+            }
+        });
+
+        function showTooltip(text) {
+            tooltip.textContent = text;
+            tooltip.style.display = 'block';
+        }
+
+        function hideTooltip() {
+            tooltip.style.display = 'none';
+        }
+
+        // Copy Hex to Clipboard with Toast Notification
+        function copyHexToClipboard(hexText) {
+            navigator.clipboard.writeText(hexText).then(() => {
+                copyToast.textContent = `Copied HEX code to Clipboard!`;
+                copyToast.style.display = 'block';
+                setTimeout(() => {
+                    copyToast.style.display = 'none';
+                }, 1800);
+            });
+        }
+
+        // Attach hover tooltip and click-to-copy ONLY (no focus or selection changes)
+        function attachSwatchInteractivity(element, hexText) {
+            element.addEventListener('mouseenter', () => showTooltip(hexText));
+            element.addEventListener('mouseleave', hideTooltip);
+            element.addEventListener('click', (e) => {
+                e.stopPropagation(); // Prevents triggering any underlying 3D canvas events
+                copyHexToClipboard(hexText);
+            });
+}
+
         function applyHarmonyFilter() {
             clearHarmonyLines();
             const mode = document.getElementById('harmony-select').value;
+            const harmonyContainer = document.getElementById('harmony-preview-container');
+            const harmonyRow = document.getElementById('harmony-preview-row');
+            harmonyRow.innerHTML = '';
 
             if (selectedIndex === null || mode === 'none') {
-                // Reset all points to default scale and opacity
+                harmonyContainer.style.display = 'none';
                 for (let i = 0; i < pointCount; i++) {
                     const pt = colorData[i];
                     dummy.position.set(pt.r, pt.g, pt.b);
@@ -460,26 +601,24 @@
                 const dist = hueDistance(baseHSL.h, ptHSL.h);
                 let isMatch = false;
 
-                // Skip unsaturated gray points for hue-based harmonies (unless monochromatic)
                 const isSaturated = baseHSL.s > 0.1 && ptHSL.s > 0.1;
 
                 if (mode === 'complementary' && isSaturated) {
-                    isMatch = Math.abs(dist - 0.5) < 0.04; // ~180 degrees
+                    isMatch = Math.abs(dist - 0.5) < 0.04;
                 } else if (mode === 'triadic' && isSaturated) {
-                    isMatch = Math.abs(dist - (1/3)) < 0.04 || Math.abs(dist - (2/3)) < 0.04; // ~120 / 240 degrees
+                    isMatch = Math.abs(dist - (1/3)) < 0.04 || Math.abs(dist - (2/3)) < 0.04;
                 } else if (mode === 'analogous' && isSaturated) {
-                    isMatch = dist > 0.01 && dist < 0.09; // ~±30 degrees
+                    isMatch = dist > 0.01 && dist < 0.09;
                 } else if (mode === 'split-complementary' && isSaturated) {
-                    isMatch = Math.abs(dist - (150/360)) < 0.04 || Math.abs(dist - (210/360)) < 0.04; // 150 & 210 degrees
+                    isMatch = Math.abs(dist - (150/360)) < 0.04 || Math.abs(dist - (210/360)) < 0.04;
                 } else if (mode === 'monochromatic') {
-                    isMatch = dist < 0.03 && Math.abs(ptHSL.s - baseHSL.s) < 0.2;
+                    isMatch = dist < 0.03 && Math.abs(ptHSL.s - baseHSL.s) < 0.2 && i !== selectedIndex;
                 }
 
-                // Include base point itself
                 if (i === selectedIndex) isMatch = true;
 
                 if (isMatch) {
-                    matchedPoints.push(pt);
+                    if (i !== selectedIndex) matchedPoints.push(pt);
                     dummy.position.set(pt.r, pt.g, pt.b);
                     dummy.scale.set(currentScale * 1.8, currentScale * 1.8, currentScale * 1.8);
                 } else {
@@ -492,12 +631,131 @@
 
             instancedMesh.instanceMatrix.needsUpdate = true;
 
-            // Draw 3D vector lines connecting the base color to top harmony matches
-            matchedPoints.forEach(targetPt => {
-                if (targetPt !== basePt) {
+            // --- Curate preview swatches: MAX 3 DISTINCT HARMONIC COLORS ---
+            let curatedSwatches = [];
+
+            if (matchedPoints.length > 0) {
+                if (mode === 'complementary') {
+                    // Find the closest single match to exact opposite hue & equal saturation/lightness
+                    curatedSwatches = [getClosestPoint(matchedPoints, (baseHSL.h + 0.5) % 1.0, baseHSL.s, baseHSL.l)];
+                } else if (mode === 'triadic') {
+                    // Pick 2 representative colors at +120° and +240°
+                    const targetH1 = (baseHSL.h + 1/3) % 1.0;
+                    const targetH2 = (baseHSL.h + 2/3) % 1.0;
+                    curatedSwatches = [
+                        getClosestPoint(matchedPoints, targetH1, baseHSL.s, baseHSL.l),
+                        getClosestPoint(matchedPoints, targetH2, baseHSL.s, baseHSL.l)
+                    ];
+                } else if (mode === 'split-complementary') {
+                    // Pick 2 representative colors at +150° and +210°
+                    const targetH1 = (baseHSL.h + 150/360) % 1.0;
+                    const targetH2 = (baseHSL.h + 210/360) % 1.0;
+                    curatedSwatches = [
+                        getClosestPoint(matchedPoints, targetH1, baseHSL.s, baseHSL.l),
+                        getClosestPoint(matchedPoints, targetH2, baseHSL.s, baseHSL.l)
+                    ];
+                } else if (mode === 'analogous') {
+                    // Pick 2 representative colors at +30° and -30°
+                    const targetH1 = (baseHSL.h + 30/360) % 1.0;
+                    const targetH2 = (baseHSL.h - 30/360 + 1.0) % 1.0;
+                    curatedSwatches = [
+                        getClosestPoint(matchedPoints, targetH1, baseHSL.s, baseHSL.l),
+                        getClosestPoint(matchedPoints, targetH2, baseHSL.s, baseHSL.l)
+                    ];
+                } else if (mode === 'monochromatic') {
+                    // Pick up to 3 points across lightness levels
+                    curatedSwatches = matchedPoints
+                        .sort((a, b) => getHSLFromGrid(a.r, a.g, a.b).l - getHSLFromGrid(b.r, b.g, b.b).l)
+                        .filter((_, idx, arr) => idx === 0 || idx === Math.floor(arr.length / 2) || idx === arr.length - 1)
+                        .slice(0, 3);
+                }
+
+                // Draw 3D connecting lines for ALL matching grid points
+                matchedPoints.forEach(targetPt => {
                     drawConnectingLine(basePt, targetPt, 0xffffff);
+                });
+
+                // Display ONLY the curated swatches in the UI (Max 3)
+                harmonyContainer.style.display = 'flex';
+                curatedSwatches.filter(Boolean).forEach(targetPt => {
+                const swatch = document.createElement('div');
+                swatch.style.flex = '1';
+                swatch.style.height = '100%';
+                swatch.style.borderRadius = '4px';
+                swatch.style.backgroundColor = targetPt.hex_full;
+                swatch.style.border = '1px solid rgba(255,255,255,0.2)';
+                swatch.style.cursor = 'pointer';
+
+                // Attach ONLY floating tooltip and click-to-copy
+                attachSwatchInteractivity(swatch, targetPt.hex_full);
+
+                harmonyRow.appendChild(swatch);
+            });
+            } else {
+                harmonyContainer.style.display = 'none';
+            }
+        }
+
+        
+        // Helper: Finds single best matching point in grid closest to target HSL
+        function getClosestPoint(candidates, targetH, targetS, targetL) {
+            if (!candidates || candidates.length === 0) return null;
+            let bestMatch = candidates[0];
+            let minDiff = Infinity;
+
+            candidates.forEach(pt => {
+                const hsl = getHSLFromGrid(pt.r, pt.g, pt.b);
+                const hDiff = hueDistance(hsl.h, targetH);
+                const sDiff = Math.abs(hsl.s - targetS);
+                const lDiff = Math.abs(hsl.l - targetL);
+                const totalDiff = hDiff * 3 + sDiff + lDiff; // Prioritize hue match
+
+                if (totalDiff < minDiff) {
+                    minDiff = totalDiff;
+                    bestMatch = pt;
                 }
             });
+
+            return bestMatch;
+        }
+
+        function searchAndFocusHex() {
+            document.getElementById('hex-search').classList.remove('dimmed');
+            let query = document.getElementById('hex-search').value.trim().replace('#', '');
+            if (!query) return;
+
+            let r, g, b;
+
+            if (query.length === 3) {
+                r = parseInt(query[0], 16);
+                g = parseInt(query[1], 16);
+                b = parseInt(query[2], 16);
+            } else if (query.length === 6) {
+                r = Math.round(parseInt(query.substring(0, 2), 16) / 17);
+                g = Math.round(parseInt(query.substring(2, 4), 16) / 17);
+                b = Math.round(parseInt(query.substring(4, 6), 16) / 17);
+            } else {
+                alert("Please enter a valid Hex code (e.g. #F00 or #FF0000)");
+                return;
+            }
+
+            if (isNaN(r) || isNaN(g) || isNaN(b)) {
+                alert("Invalid Hex characters.");
+                return;
+            }
+
+            // Clamp coordinates to grid bounds [0, 15]
+            r = Math.max(0, Math.min(15, r));
+            g = Math.max(0, Math.min(15, g));
+            b = Math.max(0, Math.min(15, b));
+
+            // Find closest index in flat array (R * 256 + G * 16 + B)
+            const targetIndex = colorData.findIndex(pt => pt.r === r && pt.g === g && pt.b === b);
+
+            if (targetIndex !== -1) {
+                selectPoint(targetIndex);
+                focusOnSelectedPoint();
+            }
         }
 
         // --- Event Listeners ---
