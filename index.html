@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>3D Hex Color Cube - Interactive Inspector</title>
+    <title>Hex Color Cube</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body {
@@ -149,7 +149,7 @@
     <div id="canvas-container"></div>
 
     <div id="header-panel" class="ui-panel">
-        <h1><span style="color: #ef4444;">R</span><span style="color: #22c55e;">G</span><span style="color: #3b82f6;">B</span> Color Cube Inspector</h1>
+        <h1><span style="color: #ef4444;">R</span><span style="color: #22c55e;">G</span><span style="color: #3b82f6;">B</span> HEX Color Cube </h1>
         <p class="subtitle">Interactive 3D space with 4,096 Hex colors (0x0 to 0xF per channel). Click any color point to focus and inspect details.</p>
     </div>
 
@@ -159,8 +159,8 @@
             Reset View
         </button>
         <div class="slider-group">
-            <label><span>Point Size</span><span id="size-val">0.25</span></label>
-            <input type="range" id="point-size-slider" min="0.1" max="0.75" step="0.05" value="0.25">
+            <label><span>Point Size</span><span id="size-val">0.15</span></label>
+            <input type="range" id="point-size-slider" min="0.1" max="0.75" step="0.05" value="0.15">
         </div>
         <div class="slider-group">
             <label><span>Grid Opacity</span><span id="opacity-val">0.9</span></label>
@@ -192,6 +192,28 @@
                 <span class="info-value" id="info-b">Hex: 8 (Dec: 8)</span>
             </div>
         </div>
+        
+        <div class="slider-group" style="margin-top: 4px;">
+            <label for="harmony-select"><span>Color Harmony</span></label>
+            <select id="harmony-select" style="
+                width: 100%;
+                padding: 8px;
+                border-radius: 6px;
+                background: #27272a;
+                color: #fff;
+                border: 1px solid rgba(255,255,255,0.15);
+                font-size: 0.85rem;
+                cursor: pointer;
+            " disabled>
+                <option value="none">None (Show All)</option>
+                <option value="complementary">Complementary (180°)</option>
+                <option value="triadic">Triadic (120° Triangle)</option>
+                <option value="analogous">Analogous (±30°)</option>
+                <option value="split-complementary">Split-Complementary</option>
+                <option value="monochromatic">Monochromatic (Shades/Tints)</option>
+            </select>
+        </div>
+
         <button id="focus-btn" class="control-btn" disabled>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
             Zoom & Focus Point
@@ -247,7 +269,7 @@
 
         const instancedMesh = new THREE.InstancedMesh(sphereGeo, pointMaterial, pointCount);
         const dummy = new THREE.Object3D();
-        let currentScale = 0.25;
+        let currentScale = 0.15;
 
         for (let i = 0; i < pointCount; i++) {
             const pt = colorData[i];
@@ -267,6 +289,36 @@
         const ringGeo = new THREE.RingGeometry(0.5, 0.65, 32);
         const ringMat = new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.DoubleSide, transparent: true, opacity: 0.9 });
         const focusRing = new THREE.Mesh(ringGeo, ringMat);
+
+        // --- 3D Harmony Connecting Lines Setup ---
+        const harmonyLinesGroup = new THREE.Group();
+        scene.add(harmonyLinesGroup);
+
+        function clearHarmonyLines() {
+            while (harmonyLinesGroup.children.length > 0) {
+                const obj = harmonyLinesGroup.children[0];
+                obj.geometry.dispose();
+                obj.material.dispose();
+                harmonyLinesGroup.remove(obj);
+            }
+        }
+
+        function drawConnectingLine(p1, p2, hexColor = 0xffffff) {
+            const points = [
+                new THREE.Vector3(p1.r, p1.g, p1.b),
+                new THREE.Vector3(p2.r, p2.g, p2.b)
+            ];
+            const lineGeo = new THREE.BufferGeometry().setFromPoints(points);
+            const lineMat = new THREE.LineBasicMaterial({ 
+                color: hexColor, 
+                linewidth: 2, 
+                transparent: true, 
+                opacity: 0.9 
+            });
+            const line = new THREE.Line(lineGeo, lineMat);
+            harmonyLinesGroup.add(line);
+        }
+
         focusRing.visible = false;
         scene.add(focusRing);
 
@@ -305,6 +357,9 @@
             document.getElementById('info-r').textContent = `Hex: ${pt.r.toString(16).toUpperCase()} (Dec: ${pt.r})`;
             document.getElementById('info-g').textContent = `Hex: ${pt.g.toString(16).toUpperCase()} (Dec: ${pt.g})`;
             document.getElementById('info-b').textContent = `Hex: ${pt.b.toString(16).toUpperCase()} (Dec: ${pt.b})`;
+            // Add these two lines at the end of the selectPoint(index) function:
+            document.getElementById('harmony-select').disabled = false;
+            applyHarmonyFilter();
 
             document.getElementById('focus-btn').disabled = false;
 
@@ -355,12 +410,100 @@
 
             focusRing.visible = false;
             document.getElementById('focus-btn').disabled = true;
+            // Add these lines inside resetCamera():
+            document.getElementById('harmony-select').value = 'none';
+            document.getElementById('harmony-select').disabled = true;
+            clearHarmonyLines();
+            applyHarmonyFilter();
             selectedIndex = null;
+        }
+
+        // Convert RGB (0-15 scale) to HSL
+        function getHSLFromGrid(r, g, b) {
+            const col = new THREE.Color(r / 15, g / 15, b / 15);
+            const hsl = {};
+            col.getHSL(hsl);
+            return hsl; // hsl.h, hsl.s, hsl.l in range [0, 1]
+        }
+
+        // Calculate shortest angular distance on Hue wheel [0, 1]
+        function hueDistance(h1, h2) {
+            const diff = Math.abs(h1 - h2);
+            return Math.min(diff, 1.0 - diff);
+        }
+
+        function applyHarmonyFilter() {
+            clearHarmonyLines();
+            const mode = document.getElementById('harmony-select').value;
+
+            if (selectedIndex === null || mode === 'none') {
+                // Reset all points to default scale and opacity
+                for (let i = 0; i < pointCount; i++) {
+                    const pt = colorData[i];
+                    dummy.position.set(pt.r, pt.g, pt.b);
+                    dummy.scale.set(currentScale, currentScale, currentScale);
+                    dummy.updateMatrix();
+                    instancedMesh.setMatrixAt(i, dummy.matrix);
+                }
+                instancedMesh.instanceMatrix.needsUpdate = true;
+                pointMaterial.opacity = parseFloat(document.getElementById('opacity-slider').value);
+                return;
+            }
+
+            const basePt = colorData[selectedIndex];
+            const baseHSL = getHSLFromGrid(basePt.r, basePt.g, basePt.b);
+            const matchedPoints = [];
+
+            for (let i = 0; i < pointCount; i++) {
+                const pt = colorData[i];
+                const ptHSL = getHSLFromGrid(pt.r, pt.g, pt.b);
+                const dist = hueDistance(baseHSL.h, ptHSL.h);
+                let isMatch = false;
+
+                // Skip unsaturated gray points for hue-based harmonies (unless monochromatic)
+                const isSaturated = baseHSL.s > 0.1 && ptHSL.s > 0.1;
+
+                if (mode === 'complementary' && isSaturated) {
+                    isMatch = Math.abs(dist - 0.5) < 0.04; // ~180 degrees
+                } else if (mode === 'triadic' && isSaturated) {
+                    isMatch = Math.abs(dist - (1/3)) < 0.04 || Math.abs(dist - (2/3)) < 0.04; // ~120 / 240 degrees
+                } else if (mode === 'analogous' && isSaturated) {
+                    isMatch = dist > 0.01 && dist < 0.09; // ~±30 degrees
+                } else if (mode === 'split-complementary' && isSaturated) {
+                    isMatch = Math.abs(dist - (150/360)) < 0.04 || Math.abs(dist - (210/360)) < 0.04; // 150 & 210 degrees
+                } else if (mode === 'monochromatic') {
+                    isMatch = dist < 0.03 && Math.abs(ptHSL.s - baseHSL.s) < 0.2;
+                }
+
+                // Include base point itself
+                if (i === selectedIndex) isMatch = true;
+
+                if (isMatch) {
+                    matchedPoints.push(pt);
+                    dummy.position.set(pt.r, pt.g, pt.b);
+                    dummy.scale.set(currentScale * 1.8, currentScale * 1.8, currentScale * 1.8);
+                } else {
+                    dummy.position.set(pt.r, pt.g, pt.b);
+                    dummy.scale.set(currentScale * 0.4, currentScale * 0.4, currentScale * 0.4);
+                }
+                dummy.updateMatrix();
+                instancedMesh.setMatrixAt(i, dummy.matrix);
+            }
+
+            instancedMesh.instanceMatrix.needsUpdate = true;
+
+            // Draw 3D vector lines connecting the base color to top harmony matches
+            matchedPoints.forEach(targetPt => {
+                if (targetPt !== basePt) {
+                    drawConnectingLine(basePt, targetPt, 0xffffff);
+                }
+            });
         }
 
         // --- Event Listeners ---
         document.getElementById('focus-btn').addEventListener('click', focusOnSelectedPoint);
         document.getElementById('reset-cam-btn').addEventListener('click', resetCamera);
+        document.getElementById('harmony-select').addEventListener('change', applyHarmonyFilter);
 
         document.getElementById('point-size-slider').addEventListener('input', (e) => {
             currentScale = parseFloat(e.target.value);
