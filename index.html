@@ -37,6 +37,40 @@
         kbd { background: #27272a; color: #d4d4d8; padding: 2px 5px; border-radius: 4px; font-size: 0.72rem; border: 1px solid #3f3f46; }
         #hex-search.dimmed { color: #666670 !important; border-color: rgba(255, 255, 255, 0.08) !important; }
         #custom-tooltip { position: fixed; pointer-events: none; z-index: 1000; background: rgba(18, 18, 20, 0.9); color: #ffffff; border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 6px; padding: 4px 8px; font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace; font-size: 0.78rem; font-weight: 600; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4); display: none; transform: translate(12px, 12px); backdrop-filter: blur(4px); }
+        
+        /* Mobile Optimizations */
+        @media (max-width: 768px) {
+            /* Stack panels vertically or convert to collapsible overlays */
+            #header-panel {
+                top: 10px;
+                left: 10px;
+                right: 10px;
+                max-width: none;
+                padding: 10px 14px;
+            }
+
+            #controls-panel {
+                top: auto;
+                bottom: 10px;
+                left: 10px;
+                right: auto;
+                width: 180px;
+                padding: 10px;
+            }
+
+            #inspector-panel {
+                bottom: 10px;
+                right: 10px;
+                width: calc(100% - 200px); /* Fit alongside controls or stack below */
+                max-width: 280px;
+                padding: 12px;
+            }
+
+            .instructions {
+                display: none; /* Hide desktop key bindings on touch screens */
+            }
+        }
+
     </style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
@@ -58,8 +92,8 @@
             <input type="range" id="point-size-slider" min="0.1" max="0.75" step="0.05" value="0.15">
         </div>
         <div class="slider-group">
-            <label><span>Grid Opacity</span><span id="opacity-val">0.9</span></label>
-            <input type="range" id="opacity-slider" min="0.1" max="1.0" step="0.05" value="0.9">
+            <label><span>Grid Opacity</span><span id="opacity-val">1.0</span></label>
+            <input type="range" id="opacity-slider" min="0.1" max="1.0" step="0.05" value="1.0">
         </div>
     </div>
     <div id="inspector-panel" class="ui-panel">
@@ -305,11 +339,11 @@
             const harmonyRow = document.getElementById('harmony-preview-row');
             harmonyRow.innerHTML = '';
             
-            // Force global opacity regardless of harmony state
             const globalOpacity = parseFloat(document.getElementById('opacity-slider').value);
             pointMaterial.opacity = globalOpacity;
 
-            if (selectedIndex === null || mode === 'none') {
+            // --- CASE 1: No point selected at all (Initial state / Reset view) ---
+            if (selectedIndex === null) {
                 harmonyContainer.style.display = 'none';
                 for (let i = 0; i < pointCount; i++) {
                     const pt = colorData[i];
@@ -322,6 +356,25 @@
                 return;
             }
 
+            // --- CASE 2: Single point selected, but Harmony is "None" ---
+            if (mode === 'none') {
+                harmonyContainer.style.display = 'none';
+                for (let i = 0; i < pointCount; i++) {
+                    const pt = colorData[i];
+                    dummy.position.set(pt.r, pt.g, pt.b);
+                    
+                    // Highlight active selected point (1.8x), shrink all unselected points (0.4x)
+                    const scaleFactor = (i === selectedIndex) ? currentScale * 1.8 : currentScale * 0.4;
+                    
+                    dummy.scale.set(scaleFactor, scaleFactor, scaleFactor);
+                    dummy.updateMatrix();
+                    instancedMesh.setMatrixAt(i, dummy.matrix);
+                }
+                instancedMesh.instanceMatrix.needsUpdate = true;
+                return;
+            }
+
+            // --- CASE 3: Active selection + Color Harmony mode chosen ---
             const basePt = colorData[selectedIndex];
             const baseHSL = getHSLFromGrid(basePt.r, basePt.g, basePt.b);
             const matchedPoints = [];
@@ -360,6 +413,7 @@
             }
             instancedMesh.instanceMatrix.needsUpdate = true;
 
+            // --- Curate preview swatches & 3D Lines ---
             let curatedSwatches = [];
             if (matchedPoints.length > 0) {
                 if (mode === 'complementary') {
