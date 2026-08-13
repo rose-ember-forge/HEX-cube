@@ -195,7 +195,7 @@
         instancedMesh.instanceColor.needsUpdate = true;
         scene.add(instancedMesh);
 
-        const ringGeo = new THREE.RingGeometry(0.5, 0.65, 32);
+        const ringGeo = new THREE.RingGeometry(0.5, 0.65, 12);
         const ringMat = new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.DoubleSide, transparent: true, opacity: 0.9 });
         const focusRing = new THREE.Mesh(ringGeo, ringMat);
         focusRing.visible = false;
@@ -226,8 +226,39 @@
         const mouse = new THREE.Vector2();
         let selectedIndex = null;
 
+        let pointerDownPos = { x: 0, y: 0 };
+        const dragThreshold = 5; // Pixels moved before assuming a drag gesture
+
+        // Track mouse position on button press
+        renderer.domElement.addEventListener('pointerdown', (e) => {
+            pointerDownPos.x = e.clientX;
+            pointerDownPos.y = e.clientY;
+        });
+
+        // Evaluate movement on button release
+        renderer.domElement.addEventListener('pointerup', (e) => {
+            const deltaX = Math.abs(e.clientX - pointerDownPos.x);
+            const deltaY = Math.abs(e.clientY - pointerDownPos.y);
+
+            // If mouse moved more than threshold, treat as OrbitControls camera drag (ignore selection)
+            if (deltaX > dragThreshold || deltaY > dragThreshold) {
+                return;
+            }
+
+            // Otherwise, treat as a stationary click selection
+            mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+
+            raycaster.setFromCamera(mouse, camera);
+            const intersects = raycaster.intersectObject(instancedMesh);
+
+            if (intersects.length > 0) {
+                selectPoint(intersects[0].instanceId);
+            }
+        });
+
         window.addEventListener('resize', onWindowResize);
-        renderer.domElement.addEventListener('click', onPointerClick);
+        // renderer.domElement.addEventListener('click', onPointerClick);
 
         function onPointerClick(event) {
             mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
