@@ -37,6 +37,77 @@
         kbd { background: #27272a; color: #d4d4d8; padding: 2px 5px; border-radius: 4px; font-size: 0.72rem; border: 1px solid #3f3f46; }
         #hex-search.dimmed { color: #666670 !important; border-color: rgba(255, 255, 255, 0.08) !important; }
         #custom-tooltip { position: fixed; pointer-events: none; z-index: 1000; background: rgba(18, 18, 20, 0.9); color: #ffffff; border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 6px; padding: 4px 8px; font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace; font-size: 0.78rem; font-weight: 600; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4); display: none; transform: translate(12px, 12px); backdrop-filter: blur(4px); }
+
+        /* Floating Help Button */
+        #help-btn {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            z-index: 50;
+            background: rgba(22, 22, 26, 0.85);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: #fff;
+            border-radius: 50%;
+            width: 42px;
+            height: 42px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 1.2rem;
+            backdrop-filter: blur(12px);
+            transition: background 0.2s ease, transform 0.2s ease;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        }
+
+        #help-btn:hover {
+            background: #3b82f6;
+            transform: scale(1.05);
+        }
+
+        /* Modal Overlay & Animation */
+        #help-modal-overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100vw; height: 100vh;
+            background: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(6px);
+            -webkit-backdrop-filter: blur(6px);
+            z-index: 2000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 1;
+            transition: opacity 0.3s ease;
+        }
+
+        #help-modal-overlay.hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        /* Modal Box */
+        .help-modal {
+            background: #16161a;
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 12px;
+            padding: 28px;
+            max-width: 420px;
+            width: 90%;
+            box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5);
+            transform: translateY(0);
+            transition: transform 0.3s ease;
+        }
+
+        #help-modal-overlay.hidden .help-modal {
+            transform: translateY(20px);
+        }
+
+        .help-modal h2 { font-size: 1.3rem; margin-bottom: 12px; color: #fff; }
+        .help-modal p { font-size: 0.9rem; color: #a0a0aa; margin-bottom: 20px; line-height: 1.5; }
+        .help-modal ul { list-style: none; margin-bottom: 24px; }
+        .help-modal li { font-size: 0.85rem; color: #d4d4d8; margin-bottom: 10px; display: flex; align-items: center; gap: 12px; }
+        .help-modal kbd { background: #27272a; color: #fff; padding: 4px 8px; border-radius: 4px; font-size: 0.75rem; border: 1px solid #3f3f46; min-width: max-content; text-align: center; }
         
         /* Mobile Optimizations */
         @media (max-width: 768px) {
@@ -137,8 +208,30 @@
     </div>
     <div id="custom-tooltip"></div>
     <div id="copy-toast" style="position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: #22c55e; color: #fff; font-weight: 600; font-size: 0.82rem; padding: 8px 16px; border-radius: 20px; box-shadow: 0 4px 16px rgba(0,0,0,0.3); z-index: 1000; display: none; pointer-events: none;">Copied to Clipboard!</div>
-    <div class="instructions">
+    
+    <!-- <div class="instructions">
         <b>Controls:</b> <kbd>Left Click + Drag</kbd> Rotate | <kbd>Right Click + Drag</kbd> Pan / Roam | <kbd>Scroll</kbd> Zoom | <kbd>Click Point</kbd> Select
+    </div> -->
+    
+    <!-- Floating Help Button -->
+    <button id="help-btn" title="How to use">?</button>
+
+    <!-- Welcome / Help Modal -->
+    <div id="help-modal-overlay">
+        <div class="help-modal">
+            <h2>Welcome to the Hex Cube</h2>
+            <p>Explore 4,096 discrete RGB colors mapped out in three dimensional cube.</p>
+            <ul>
+                <li><kbd>Left Click + Drag</kbd> Rotate the cube</li>
+                <li><kbd>Right Click + Drag</kbd> Pan around the space</li>
+                <li><kbd>Scroll</kbd> Zoom in and out</li>
+                <li><kbd>Click a Point</kbd> Inspect a color in the grid</li>
+                <li><kbd>Click a Swatch</kbd> Copy the HEX code instantly</li>
+            </ul>
+            <p style="margin-bottom: 20px;">Use the Search Color bar to look for a specific color using 3- or 6-digit HEX codes. The points are all repeated hexadecimal digits (#RRGGBB or equivalently, #RGB). Any other HEX code searched will point to the closest available color point.</p>
+            <p style = "margin-bottom: 20px;">Use the <b>Color Harmony</b> dropdown to see the colors harmonic to the selected point.</p>
+            <button id="close-help-btn" class="control-btn">Got it!</button>
+        </div>
     </div>
 
     <script>
@@ -221,6 +314,38 @@
             harmonyLinesGroup.add(line);
         }
 
+        function clearSelection() {
+        if (selectedIndex === null) return; // Already cleared
+        
+        selectedIndex = null;
+        focusRing.visible = false;
+        
+        // Reset UI Panel controls
+        document.getElementById('focus-btn').disabled = true;
+        document.getElementById('harmony-select').value = 'none';
+        document.getElementById('harmony-select').disabled = true;
+        document.getElementById('hex-search').classList.remove('dimmed');
+        
+        // Reset the main color preview box and strip previous click/hover events
+        const mainPreview = document.getElementById('color-preview');
+        mainPreview.style.backgroundColor = '#888888';
+        mainPreview.style.boxShadow = 'inset 0 0 12px rgba(0,0,0,0.2)';
+        mainPreview.style.cursor = 'default';
+        
+        const newPreview = mainPreview.cloneNode(true);
+        mainPreview.parentNode.replaceChild(newPreview, mainPreview);
+
+        // Clear info text
+        document.getElementById('info-hex-short').textContent = '---';
+        document.getElementById('info-hex-full').textContent = '------';
+        document.getElementById('info-r').textContent = '---';
+        document.getElementById('info-g').textContent = '---';
+        document.getElementById('info-b').textContent = '---';
+
+        // Restores default 3D grid point scaling and clears lines
+        applyHarmonyFilter(); 
+    }
+
         const raycaster = new THREE.Raycaster();
         raycaster.params.Points.threshold = 0.3;
         const mouse = new THREE.Vector2();
@@ -240,12 +365,11 @@
             const deltaX = Math.abs(e.clientX - pointerDownPos.x);
             const deltaY = Math.abs(e.clientY - pointerDownPos.y);
 
-            // If mouse moved more than threshold, treat as OrbitControls camera drag (ignore selection)
+            // If mouse moved more than threshold, treat as an orbit drag (ignore selection)
             if (deltaX > dragThreshold || deltaY > dragThreshold) {
                 return;
             }
 
-            // Otherwise, treat as a stationary click selection
             mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
             mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
 
@@ -254,6 +378,9 @@
 
             if (intersects.length > 0) {
                 selectPoint(intersects[0].instanceId);
+            } else {
+                // User clicked the background void; clear selection but keep camera angle
+                clearSelection();
             }
         });
 
@@ -309,16 +436,31 @@
             new TWEEN.Tween(controls.target).to({ x: targetPosition.x, y: targetPosition.y, z: targetPosition.z }, 1000).easing(TWEEN.Easing.Cubic.Out).onUpdate(() => controls.update()).start();
         }
 
+        // function resetCamera() {
+        //     new TWEEN.Tween(camera.position).to({ x: 28, y: 26, z: 34 }, 1000).easing(TWEEN.Easing.Cubic.Out).start();
+        //     new TWEEN.Tween(controls.target).to({ x: 7.5, y: 7.5, z: 7.5 }, 1000).easing(TWEEN.Easing.Cubic.Out).onUpdate(() => controls.update()).start();
+        //     focusRing.visible = false;
+        //     document.getElementById('focus-btn').disabled = true;
+        //     document.getElementById('harmony-select').value = 'none';
+        //     document.getElementById('harmony-select').disabled = true;
+        //     clearHarmonyLines();
+        //     selectedIndex = null;
+        //     applyHarmonyFilter();
+        // }
+
         function resetCamera() {
-            new TWEEN.Tween(camera.position).to({ x: 28, y: 26, z: 34 }, 1000).easing(TWEEN.Easing.Cubic.Out).start();
-            new TWEEN.Tween(controls.target).to({ x: 7.5, y: 7.5, z: 7.5 }, 1000).easing(TWEEN.Easing.Cubic.Out).onUpdate(() => controls.update()).start();
-            focusRing.visible = false;
-            document.getElementById('focus-btn').disabled = true;
-            document.getElementById('harmony-select').value = 'none';
-            document.getElementById('harmony-select').disabled = true;
-            clearHarmonyLines();
-            selectedIndex = null;
-            applyHarmonyFilter();
+            new TWEEN.Tween(camera.position)
+                .to({ x: 28, y: 26, z: 34 }, 1000)
+                .easing(TWEEN.Easing.Cubic.Out)
+                .start();
+
+            new TWEEN.Tween(controls.target)
+                .to({ x: 7.5, y: 7.5, z: 7.5 }, 1000)
+                .easing(TWEEN.Easing.Cubic.Out)
+                .onUpdate(() => controls.update())
+                .start();
+
+            clearSelection();
         }
 
         function getHSLFromGrid(r, g, b) {
@@ -335,6 +477,30 @@
 
         const tooltip = document.getElementById('custom-tooltip');
         const copyToast = document.getElementById('copy-toast');
+
+        // --- Help Modal Logic ---
+        const helpOverlay = document.getElementById('help-modal-overlay');
+        const helpBtn = document.getElementById('help-btn');
+        const closeHelpBtn = document.getElementById('close-help-btn');
+
+        function openHelp() {
+            helpOverlay.classList.remove('hidden');
+        }
+
+        function closeHelp() {
+            helpOverlay.classList.add('hidden');
+        }
+
+        // Button triggers
+        helpBtn.addEventListener('click', openHelp);
+        closeHelpBtn.addEventListener('click', closeHelp);
+
+        // Allow closing the modal by clicking the dark background outside the box
+        helpOverlay.addEventListener('click', (e) => {
+            if (e.target === helpOverlay) {
+                closeHelp();
+            }
+        });
 
         window.addEventListener('mousemove', (e) => {
             if (tooltip.style.display === 'block') {
