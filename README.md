@@ -51,3 +51,34 @@ This project structures the entire discrete gamut into a Euclidean 3D lattice, t
 | **Help Overlay**   | Click the floating `?` button                |
 
 ---
+
+## Getting Started
+
+
+Because the application is completely client-side and dependency-free, no build tools or package managers are required.
+
+
+
+1. Clone the repo:
+
+```bash
+git clone https://github.com/rose-ember-forge/3d-color-cube.git
+```
+
+2. Open `index.html` in any modern web browser
+
+
+
+## Tech Stack
+
+- **Rendering Engine**: [Three.js](https://threejs.org/) (WebGL)
+
+- **Camera Controls**: OrbitControls.js
+
+- **Interpolation**: [Tween.js](https://github.com/tweenjs/tween.js/)
+
+- **Typography & UI**: Native CSS backdrop-filter glassmorphism
+
+## License
+
+Distributed under the MIT License. See `LICENSE` for more information.
